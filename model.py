@@ -30,3 +30,6 @@ user_item_matrix = movie_data.pivot_table(index='userId', columns='movieId', val
 knn = NearestNeighbors(metric='cosine', algorithm='brute', n_neighbors=10, n_jobs=-1)
 knn.fit(user_item_matrix)
 
+def recommend_movies(movie_name, matrix, cf_model, n_recs):
+    '''Given a movie name, user-item matrix, collaborative filtering model, and number of recommendations, return a dataframe of recommended movies.'''
+    return NotImplemented
