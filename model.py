@@ -48,7 +48,8 @@ movie_lookup = (
 knn = NearestNeighbors(metric='cosine', algorithm='brute', n_neighbors=10, n_jobs=-1)
 knn.fit(movie_user_matrix)
 
-def _find_movie_id(movie_name, lookup_df):
+def find_movie_id(movie_name, lookup_df):
+    """Find the movieId for a given movie title, using exact and fuzzy matching. Returns None if no match is found."""
     titles = lookup_df['title']
 
     exact_match = titles[titles.str.lower() == movie_name.lower()]
@@ -63,34 +64,37 @@ def _find_movie_id(movie_name, lookup_df):
     return None
 
 def recommend_movies(movie_name, matrix, cf_model, lookup_df, n_recs=10):
-    """Return top-N similar movies for a given movie title."""
-    movie_id = _find_movie_id(movie_name, lookup_df)
+    """Return a dataframe of top-N similar movies for a given movie title."""
+    movie_id = find_movie_id(movie_name, lookup_df)
     if movie_id is None:
         raise ValueError(f"Movie '{movie_name}' not found.")
 
-    # +1 because the closest neighbor is the movie itself.
-    n_neighbors = min(n_recs + 1, len(matrix))
-    distances, indices = cf_model.kneighbors(matrix.loc[[movie_id]], n_neighbors=n_neighbors)
+    n_neighbors = min(n_recs + 1, len(matrix)) # +1 because the closest neighbor is the movie itself
+    distances, indices = cf_model.kneighbors(matrix.loc[[movie_id]], n_neighbors=n_neighbors) # KNN search, matrix.loc[[movie_id]] is the vector of the selected movie
 
-    neighbor_ids = matrix.index[indices.flatten()].tolist()
+    neighbor_ids = matrix.index[indices.flatten()].tolist() #map neighbor indices back to movieIds
     neighbor_distances = distances.flatten().tolist()
 
+    neighbor_similarity = [] #use cosine similarity instead of distance for better interpretability
+    for dist in neighbor_distances:
+        similarity = 1 - dist
+        neighbor_similarity.append(similarity)
+
     recs = []
-    for rec_movie_id, dist in zip(neighbor_ids, neighbor_distances):
-        if rec_movie_id == movie_id:
+    for rec_movie_id, similarity in zip(neighbor_ids, neighbor_similarity):
+        if rec_movie_id == movie_id: #skips the movie itself in the recommendations
             continue
         recs.append({
             'movieId': rec_movie_id,
             'Title': lookup_df.loc[rec_movie_id, 'title'],
-            'Distance': dist,
+            'Similarity': similarity,
         })
         if len(recs) >= n_recs:
             break
 
     return pd.DataFrame(recs)
 
-
-
+#KNN Test: 
 sample_title = 'Batman'
 recommendations = recommend_movies(sample_title, movie_user_matrix, knn, movie_lookup, n_recs=5)
 print(recommendations)
