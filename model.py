@@ -1,39 +1,48 @@
 import pandas as pd
 from difflib import get_close_matches
 from sklearn.neighbors import NearestNeighbors
+from scipy.sparse import csr_matrix
 
 movie_metadata = pd.read_csv('Data/movies_metadata.csv', low_memory=False)
-ratings = pd.read_csv('Data/ratings_small.csv') # use small ratings for now
+links = pd.read_csv('Data/links.csv')
+ratings = pd.read_csv('Data/ratings.csv')
 
-#Collaborative Filtering Approach
+# Collaborative Filtering Approach
+# Correct merge: ratings (MovieLens movieId) -> links (TMDB tmdbId) -> movies_metadata (TMDB id)
+movie_metadata['id'] = pd.to_numeric(movie_metadata['id'], errors='coerce')
+movie_metadata = movie_metadata.dropna(subset=['id']).copy()
+movie_metadata['id'] = movie_metadata['id'].astype(int)
 
-movie_metadata['movieId'] = pd.to_numeric(movie_metadata['id'], errors='coerce') # Convert 'id' to numeric, make any errors to NaN
-movie_metadata = movie_metadata.dropna(subset=['movieId']).copy() # Drop rows where 'movieId' is NaN (i.e., where conversion failed)
-movie_metadata['movieId'] = movie_metadata['movieId'].astype(int) # Now 'movieId' is a clean integer column that can be merged with ratings (id column turned into movieId)
+links['tmdbId'] = pd.to_numeric(links['tmdbId'], errors='coerce')
+links = links.dropna(subset=['tmdbId']).copy()
+links['tmdbId'] = links['tmdbId'].astype(int)
 
-movie_data = pd.merge(movie_metadata, ratings, on='movieId', how = 'inner')
-#print(movie_data[['movieId', 'title', 'rating']].head())
-
-# Check for duplicates in movieId from movie_metadata
-duplicates = movie_metadata[
-    movie_metadata.duplicated(subset='movieId', keep=False)
-]
-
-#print(duplicates[['movieId', 'title']].sort_values('movieId'))
+# Merge ratings with links on MovieLens movieId to get TMDB tmdbId
+movie_data = ratings.merge(links[['movieId', 'tmdbId']], on='movieId', how='inner')
+# Merge with metadata on TMDB id to get titles and metadata
+movie_data = movie_data.merge(movie_metadata[['id', 'title']], left_on='tmdbId', right_on='id', how='inner')
+# Keep only necessary columns for recommendations
+movie_data = movie_data[['userId', 'movieId', 'rating', 'title']]
 
 
-user_item_matrix = movie_data.pivot_table(  #use .pivot_table to handle duplicates of movieId 
-    index='userId',
-    columns='movieId',
-    values='rating'
-).fillna(0) # fill missing ratings with 0
+user_codes = movie_data['userId'].astype('category').cat.codes
+movie_codes = movie_data['movieId'].astype('category').cat.codes
 
-#print(user_item_matrix.head())
+user_item_sparse = csr_matrix(
+    (movie_data['rating'], (user_codes, movie_codes))
+)
 
-# For movie-to-movie recommendations, fit KNN on movie vectors.
-movie_user_matrix = user_item_matrix.T
+movie_user_sparse = user_item_sparse.T
 
-#print(movie_user_matrix.head())
+#KNN Approach
+knn = NearestNeighbors(metric='cosine', algorithm='brute', n_neighbors=10, n_jobs=-1)
+knn.fit(movie_user_sparse)
+
+movie_index = movie_data['movieId'].astype('category').cat.categories
+
+movie_to_idx = {movie_id: idx for idx, movie_id in enumerate(movie_index)}
+idx_to_movie = {idx: movie_id for movie_id, idx in movie_to_idx.items()}
+
 
 movie_lookup = (
     movie_data[['movieId', 'title']]
@@ -41,12 +50,6 @@ movie_lookup = (
     .drop_duplicates(subset=['movieId'])
     .set_index('movieId')
 )
-
-#TODO: Compress user item matrix with scipy sparse matrix to save memory, then mabye apply SVD for dimesnionality reduction and make recommendations based on that
-
-#KNN Approach
-knn = NearestNeighbors(metric='cosine', algorithm='brute', n_neighbors=10, n_jobs=-1)
-knn.fit(movie_user_matrix)
 
 def find_movie_id(movie_name, lookup_df):
     """Find the movieId for a given movie title, using exact and fuzzy matching. Returns None if no match is found."""
@@ -68,11 +71,14 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, n_recs=10):
     movie_id = find_movie_id(movie_name, lookup_df)
     if movie_id is None:
         raise ValueError(f"Movie '{movie_name}' not found.")
+    movie_idx = movie_to_idx[movie_id]
 
-    n_neighbors = min(n_recs + 1, len(matrix)) # +1 because the closest neighbor is the movie itself
-    distances, indices = cf_model.kneighbors(matrix.loc[[movie_id]], n_neighbors=n_neighbors) # KNN search, matrix.loc[[movie_id]] is the vector of the selected movie
+    n_neighbors = min(n_recs + 1, matrix.shape[0]) # +1 because the closest neighbor is the movie itself
+    distances, indices = cf_model.kneighbors( # KNN search
+        matrix[movie_idx], # matrix[movie_idx] is the vector of the selected movie
+        n_neighbors=n_neighbors) 
 
-    neighbor_ids = matrix.index[indices.flatten()].tolist() #map neighbor indices back to movieIds
+    neighbor_movie_ids = [idx_to_movie[i] for i in indices.flatten()] #map neighbor indices back to movieIds
     neighbor_distances = distances.flatten().tolist()
 
     neighbor_similarity = [] #use cosine similarity instead of distance for better interpretability
@@ -81,7 +87,7 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, n_recs=10):
         neighbor_similarity.append(similarity)
 
     recs = []
-    for rec_movie_id, similarity in zip(neighbor_ids, neighbor_similarity):
+    for rec_movie_id, similarity in zip(neighbor_movie_ids, neighbor_similarity):
         if rec_movie_id == movie_id: #skips the movie itself in the recommendations
             continue
         recs.append({
@@ -91,10 +97,19 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, n_recs=10):
         })
         if len(recs) >= n_recs:
             break
-
+    
+    print(f"Recommendations for '{movie_name}' at movieId {movie_id}:")
     return pd.DataFrame(recs)
 
 #KNN Test: 
-sample_title = 'Batman'
-recommendations = recommend_movies(sample_title, movie_user_matrix, knn, movie_lookup, n_recs=5)
-print(recommendations)
+sample_title1 = 'Batman'
+recommendations1 = recommend_movies(sample_title1, movie_user_sparse, knn, movie_lookup, n_recs=5)
+print(recommendations1)
+
+sample_title2 = 'Toy Story'
+recommendations2 = recommend_movies(sample_title2, movie_user_sparse, knn, movie_lookup, n_recs=5)
+print(recommendations2)
+
+sample_title3 = 'It'
+recommendations3 = recommend_movies(sample_title3, movie_user_sparse, knn, movie_lookup, n_recs=5)
+print(recommendations3)
