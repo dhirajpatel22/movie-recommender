@@ -26,7 +26,7 @@ user_item_matrix = movie_data.pivot_table(  #use .pivot_table to handle duplicat
     index='userId',
     columns='movieId',
     values='rating'
-).fillna(0)                                 # fill missing ratings with 0
+).fillna(0) # fill missing ratings with 0
 
 #print(user_item_matrix.head())
 
