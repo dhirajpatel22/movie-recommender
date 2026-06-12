@@ -4,6 +4,7 @@ from sklearn.neighbors import NearestNeighbors
 from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 movie_metadata = pd.read_csv('Data/movies_metadata.csv', low_memory=False)
 links = pd.read_csv('Data/links.csv')
@@ -46,9 +47,26 @@ movie_to_idx = {movie_id: idx for idx, movie_id in enumerate(movie_index)}
 idx_to_movie = {idx: movie_id for movie_id, idx in movie_to_idx.items()}
 
 # SVD Approach
-svd_components = min(100, max(1, min(movie_user_sparse.shape) - 1))
+svd_components = 100
 svd = TruncatedSVD(n_components=svd_components, random_state=42)
 movie_factors = svd.fit_transform(movie_user_sparse)
+
+"""
+#Find optimal number of SVD components by checking explained variance for different k values, optimal value is 100
+k_values = [10, 20, 50, 100, 150, 200]
+
+results = []
+
+for k in k_values:
+    svd = TruncatedSVD(n_components=k, random_state=42)
+    movie_factors = svd.fit_transform(movie_user_sparse)
+
+    explained = svd.explained_variance_ratio_.sum()
+
+    results.append((k, explained))
+
+print(results)"""
+
 
 movie_lookup = (
     movie_data[['movieId', 'title']]
@@ -128,25 +146,24 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, model_type, n_recs
         return pd.DataFrame(recs)
   
 
-#KNN Test: 
+#KNN vs SVD: 
 sample_title1 = 'Batman'
-recommendations1 = recommend_movies(sample_title1, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
-print(recommendations1)
-
 sample_title2 = 'Toy Story'
-recommendations2 = recommend_movies(sample_title2, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
-print(recommendations2)
+sample_title3 = 'Titanic'
 
-sample_title3 = 'It'
-recommendations3 = recommend_movies(sample_title3, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
-print(recommendations3)
+knn1 = recommend_movies(sample_title1, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
+print(knn1)
+svd1 = recommend_movies(sample_title1, movie_factors, svd,  movie_lookup, 'svd', n_recs=5)
+print(svd1)
+knn2 = recommend_movies(sample_title2, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
+print(knn2)
+svd2 = recommend_movies(sample_title2, movie_factors, svd, movie_lookup, 'svd', n_recs=5)
+print(svd2)
+knn3 = recommend_movies(sample_title3, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
+print(knn3)
+svd3 = recommend_movies(sample_title3, movie_factors, svd, movie_lookup, 'svd', n_recs=5)
+print(svd3)
 
-#SVD Test:
-recommendations_svd1 = recommend_movies(sample_title1, movie_factors, svd,  movie_lookup, 'svd', n_recs=5)
-print(recommendations_svd1)
-
-recommendations_svd2 = recommend_movies(sample_title2, movie_factors, svd, movie_lookup, 'svd', n_recs=5)
-print(recommendations_svd2)
-
-recommendations_svd3 = recommend_movies(sample_title3, movie_factors, svd, movie_lookup, 'svd', n_recs=5)
-print(recommendations_svd3)
+'''Qualitative evaluation of recommendation outputs indicated that the SVD-based recommender produced more coherent movie neighborhoods than the KNN baseline. 
+For example, SVD associated Toy Story with Toy Story 2 and A Bug's Life, whereas KNN primarily surfaced broadly popular films. 
+Therefore, the SVD recommender was selected as the final model.'''
