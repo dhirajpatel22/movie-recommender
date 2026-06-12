@@ -2,6 +2,9 @@ import pandas as pd
 from difflib import get_close_matches
 from sklearn.neighbors import NearestNeighbors
 from scipy.sparse import csr_matrix
+from sklearn.decomposition import TruncatedSVD
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 movie_metadata = pd.read_csv('Data/movies_metadata.csv', low_memory=False)
 links = pd.read_csv('Data/links.csv')
@@ -43,6 +46,27 @@ movie_index = movie_data['movieId'].astype('category').cat.categories
 movie_to_idx = {movie_id: idx for idx, movie_id in enumerate(movie_index)}
 idx_to_movie = {idx: movie_id for movie_id, idx in movie_to_idx.items()}
 
+# SVD Approach
+svd_components = 100
+svd = TruncatedSVD(n_components=svd_components, random_state=42)
+movie_factors = svd.fit_transform(movie_user_sparse)
+
+"""
+#Find optimal number of SVD components by checking explained variance for different k values, optimal value is 100
+k_values = [10, 20, 50, 100, 150, 200]
+
+results = []
+
+for k in k_values:
+    svd = TruncatedSVD(n_components=k, random_state=42)
+    movie_factors = svd.fit_transform(movie_user_sparse)
+
+    explained = svd.explained_variance_ratio_.sum()
+
+    results.append((k, explained))
+
+print(results)"""
+
 
 movie_lookup = (
     movie_data[['movieId', 'title']]
@@ -66,50 +90,80 @@ def find_movie_id(movie_name, lookup_df):
 
     return None
 
-def recommend_movies(movie_name, matrix, cf_model, lookup_df, n_recs=10):
+def recommend_movies(movie_name, matrix, cf_model, lookup_df, model_type, n_recs=10):
     """Return a dataframe of top-N similar movies for a given movie title."""
+    
     movie_id = find_movie_id(movie_name, lookup_df)
     if movie_id is None:
         raise ValueError(f"Movie '{movie_name}' not found.")
     movie_idx = movie_to_idx[movie_id]
 
-    n_neighbors = min(n_recs + 1, matrix.shape[0]) # +1 because the closest neighbor is the movie itself
-    distances, indices = cf_model.kneighbors( # KNN search
-        matrix[movie_idx], # matrix[movie_idx] is the vector of the selected movie
-        n_neighbors=n_neighbors) 
+    if model_type.lower() == 'knn':
+        print("Using KNN model for recommendations.")
 
-    neighbor_movie_ids = [idx_to_movie[i] for i in indices.flatten()] #map neighbor indices back to movieIds
-    neighbor_distances = distances.flatten().tolist()
+        n_neighbors = min(n_recs + 1, matrix.shape[0]) # +1 because the closest neighbor is the movie itself
+        distances, indices = cf_model.kneighbors( # KNN search
+            matrix[movie_idx], # matrix[movie_idx] is the vector of the selected movie
+            n_neighbors=n_neighbors) 
 
-    neighbor_similarity = [] #use cosine similarity instead of distance for better interpretability
-    for dist in neighbor_distances:
-        similarity = 1 - dist
-        neighbor_similarity.append(similarity)
+        neighbor_movie_ids = [idx_to_movie[i] for i in indices.flatten()] #map neighbor indices back to movieIds
+        neighbor_distances = distances.flatten().tolist()
 
-    recs = []
-    for rec_movie_id, similarity in zip(neighbor_movie_ids, neighbor_similarity):
-        if rec_movie_id == movie_id: #skips the movie itself in the recommendations
-            continue
-        recs.append({
-            'movieId': rec_movie_id,
-            'Title': lookup_df.loc[rec_movie_id, 'title'],
-            'Similarity': similarity,
-        })
-        if len(recs) >= n_recs:
-            break
-    
-    print(f"Recommendations for '{movie_name}' at movieId {movie_id}:")
-    return pd.DataFrame(recs)
+        neighbor_similarity = [] #use cosine similarity instead of distance for better interpretability
+        for dist in neighbor_distances:
+            similarity = 1 - dist
+            neighbor_similarity.append(similarity)
 
-#KNN Test: 
+        recs = []
+        for rec_movie_id, similarity in zip(neighbor_movie_ids, neighbor_similarity):
+            if rec_movie_id == movie_id: #skips the movie itself in the recommendations
+                continue
+            recs.append({
+                'movieId': rec_movie_id,
+                'Title': lookup_df.loc[rec_movie_id, 'title'],
+                'Similarity': similarity,
+            })
+            if len(recs) >= n_recs:
+                break
+        
+        print(f"Recommendations for '{movie_name}' at movieId {movie_id}:")
+        return pd.DataFrame(recs)
+    elif model_type.lower() == 'svd':
+        print("Using SVD model for recommendations.")
+        movie_vector = matrix[movie_idx].reshape(1, -1)  # Get the latent factors for the selected movie
+        similarities = cosine_similarity(movie_vector, matrix).flatten()  # Compare against all movie vectors
+        similar_indices = similarities.argsort()[::-1][1:n_recs+1]  # Exclude the movie itself
+        
+        recs = []
+        for idx in similar_indices:
+            rec_movie_id = idx_to_movie[idx]
+            recs.append({
+                'movieId': rec_movie_id,
+                'Title': lookup_df.loc[rec_movie_id, 'title'],
+                'Similarity': similarities[idx],
+            })
+        print(f"Recommendations for '{movie_name}' at movieId {movie_id}:")
+        return pd.DataFrame(recs)
+  
+
+#KNN vs SVD: 
 sample_title1 = 'Batman'
-recommendations1 = recommend_movies(sample_title1, movie_user_sparse, knn, movie_lookup, n_recs=5)
-print(recommendations1)
-
 sample_title2 = 'Toy Story'
-recommendations2 = recommend_movies(sample_title2, movie_user_sparse, knn, movie_lookup, n_recs=5)
-print(recommendations2)
+sample_title3 = 'Titanic'
 
-sample_title3 = 'It'
-recommendations3 = recommend_movies(sample_title3, movie_user_sparse, knn, movie_lookup, n_recs=5)
-print(recommendations3)
+knn1 = recommend_movies(sample_title1, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
+print(knn1)
+svd1 = recommend_movies(sample_title1, movie_factors, svd,  movie_lookup, 'svd', n_recs=5)
+print(svd1)
+knn2 = recommend_movies(sample_title2, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
+print(knn2)
+svd2 = recommend_movies(sample_title2, movie_factors, svd, movie_lookup, 'svd', n_recs=5)
+print(svd2)
+knn3 = recommend_movies(sample_title3, movie_user_sparse, knn, movie_lookup, 'knn', n_recs=5)
+print(knn3)
+svd3 = recommend_movies(sample_title3, movie_factors, svd, movie_lookup, 'svd', n_recs=5)
+print(svd3)
+
+'''Qualitative evaluation of recommendation outputs indicated that the SVD-based recommender produced more coherent movie neighborhoods than the KNN baseline. 
+For example, SVD associated Toy Story with Toy Story 2 and A Bug's Life, whereas KNN primarily surfaced broadly popular films. 
+Therefore, the SVD recommender was selected as the final model.'''
