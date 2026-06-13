@@ -5,6 +5,7 @@ from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+import pickle
 
 movie_metadata = pd.read_csv('Data/movies_metadata.csv', low_memory=False)
 links = pd.read_csv('Data/links.csv')
@@ -50,6 +51,9 @@ idx_to_movie = {idx: movie_id for movie_id, idx in movie_to_idx.items()}
 svd_components = 100
 svd = TruncatedSVD(n_components=svd_components, random_state=42)
 movie_factors = svd.fit_transform(movie_user_sparse)
+
+with open('svd_model.pkl', 'wb') as file:
+    pickle.dump(svd, file)
 
 """
 #Find optimal number of SVD components by checking explained variance for different k values, optimal value is 100
