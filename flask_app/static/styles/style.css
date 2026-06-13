@@ -1,0 +1,115 @@
+:root {
+            color-scheme: light;
+            --bg: #f6f1e8;
+            --panel: #ffffff;
+            --text: #1f2933;
+            --muted: #62707d;
+            --accent: #b45309;
+            --border: #e5ddd0;
+            --stripe: #faf7f2;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Georgia, 'Times New Roman', serif;
+            background: linear-gradient(180deg, var(--bg), #efe6d9);
+            color: var(--text);
+        }
+
+        .page {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 48px 20px 56px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            box-shadow: 0 18px 50px rgba(31, 41, 51, 0.08);
+            padding: 28px;
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: clamp(2rem, 4vw, 3rem);
+            line-height: 1.1;
+        }
+
+        .subtitle {
+            margin: 0 0 24px;
+            color: var(--muted);
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        .recommendations-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: inherit;
+            min-width: 520px;
+        }
+
+        .recommendations-table thead th {
+            text-align: left;
+            padding: 14px 16px;
+            background: #f0e7da;
+            color: #5b3a1a;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .recommendations-table tbody td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .recommendations-table tbody tr:nth-child(even) {
+            background: var(--stripe);
+        }
+
+        .recommendations-table tbody tr:hover {
+            background: #f4eadc;
+        }
+
+        .recommendations-table tbody td:first-child,
+        .recommendations-table thead th:first-child {
+            width: 72px;
+            text-align: center;
+            font-weight: 700;
+        }
+
+        form {
+            margin-top: 28px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        input {
+            flex: 1 1 260px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font: inherit;
+        }
+
+        button {
+            padding: 12px 18px;
+            border: 0;
+            border-radius: 12px;
+            background: var(--accent);
+            color: white;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        button:hover {
+            filter: brightness(0.95);
+        }
