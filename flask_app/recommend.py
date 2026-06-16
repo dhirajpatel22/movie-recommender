@@ -42,7 +42,7 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, model_type='svd', 
     
     movie_id = find_movie_id(movie_name, lookup_df)
     if movie_id is None:
-        raise ValueError(f"Movie '{movie_name}' not found.")
+        return None
     movie_idx = movie_to_idx[movie_id]
 
     if model_type.lower() == 'svd':
