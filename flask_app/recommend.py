@@ -5,52 +5,22 @@ from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-movie_metadata = pd.read_csv('Data/movies_metadata.csv', low_memory=False)
-links = pd.read_csv('Data/links.csv')
-ratings = pd.read_csv('Data/ratings.csv')
+import pickle
 
-# Collaborative Filtering Approach
-# Correct merge: ratings (MovieLens movieId) -> links (TMDB tmdbId) -> movies_metadata (TMDB id)
-movie_metadata['id'] = pd.to_numeric(movie_metadata['id'], errors='coerce')
-movie_metadata = movie_metadata.dropna(subset=['id']).copy()
-movie_metadata['id'] = movie_metadata['id'].astype(int)
+# Load recommendation data
+with open('recommendation_data.pkl', 'rb') as file:
+    data = pickle.load(file)
+# Load SVD model
+with open ('svd_model.pkl', 'rb') as file:
+    svd = pickle.load(file)
 
-links['tmdbId'] = pd.to_numeric(links['tmdbId'], errors='coerce')
-links = links.dropna(subset=['tmdbId']).copy()
-links['tmdbId'] = links['tmdbId'].astype(int)
+movie_user_sparse = data['movie_user_sparse']
+movie_index = data['movie_index']
+movie_lookup = data['movie_lookup']
+movie_to_idx = data['movie_to_idx']
+idx_to_movie = data['idx_to_movie']
 
-# Merge ratings with links on MovieLens movieId to get TMDB tmdbId
-movie_data = ratings.merge(links[['movieId', 'tmdbId']], on='movieId', how='inner')
-# Merge with metadata on TMDB id to get titles and metadata
-movie_data = movie_data.merge(movie_metadata[['id', 'title']], left_on='tmdbId', right_on='id', how='inner')
-# Keep only necessary columns for recommendations
-movie_data = movie_data[['userId', 'movieId', 'rating', 'title']]
-
-
-user_codes = movie_data['userId'].astype('category').cat.codes
-movie_codes = movie_data['movieId'].astype('category').cat.codes
-
-user_item_sparse = csr_matrix(
-    (movie_data['rating'], (user_codes, movie_codes))
-)
-
-movie_user_sparse = user_item_sparse.T
-movie_index = movie_data['movieId'].astype('category').cat.categories
-
-movie_to_idx = {movie_id: idx for idx, movie_id in enumerate(movie_index)}
-idx_to_movie = {idx: movie_id for movie_id, idx in movie_to_idx.items()}
-
-# SVD Approach
-svd_components = 100
-svd = TruncatedSVD(n_components=svd_components, random_state=42)
-movie_factors = svd.fit_transform(movie_user_sparse)
-
-movie_lookup = (
-    movie_data[['movieId', 'title']]
-    .dropna(subset=['title'])
-    .drop_duplicates(subset=['movieId'])
-    .set_index('movieId')
-)
+movie_factors = svd
 
 def find_movie_id(movie_name, lookup_df):
     """Find the movieId for a given movie title, using exact and fuzzy matching. Returns None if no match is found."""
