@@ -1,6 +1,7 @@
 Data/
 .DS_Store
 flask_app/svd_model.pkl
+svd_model.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
