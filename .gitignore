@@ -1,4 +1,9 @@
 Data/
+.DS_Store
+flask_app/svd_model.pkl
+svd_model.pkl
+recommendation_data.pkl
+flask_app/recommendation_data.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

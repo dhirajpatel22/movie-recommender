@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recommendations for {{ title }} Movie</title>
+    <link href="{{url_for('static', filename='styles/style.css')}}" rel="stylesheet" />
+</head>
+<body>
+    <main class="page">
+        <section class="card">
+            <h1>Recommendations based on {{ title }}</h1>
+            <p class="subtitle">Top ranked movies similar to your selection.</p>
+
+            <div class="table-wrap">
+                {{ recommendations | safe }}
+            </div>
+
+            <form action="/movie" method="get">
+                <input type="text" name="movie" id="movie" placeholder="Enter a movie" />
+                <button type="submit">Submit</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>
