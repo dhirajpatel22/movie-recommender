@@ -3,15 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Index</title>
+    <title>Movie Recommender</title>
     <link href="{{url_for('static', filename='styles/style.css')}}" rel="stylesheet" />
 </head>
 <body>
-    <h1>Movie Recommender</h1>
-    <form action="/movie">
-        <input type="text" name="movie" id="movie"
-        placeholder="Enter a movie" />
-        <button type="submit">Submit</button>
-    </form>
+    <main class="page">
+        <section class="card empty-state">
+            <div class="hero">
+                <span class="eyebrow">Movie Recommender</span>
+                <h1>Find movies that match your taste.</h1>
+                <p class="subtitle">Type in a movie you like and get similar picks based on the recommendation model.</p>
+            </div>
+
+            <form class="search-form" action="/movie" method="get">
+                <input type="text" name="movie" id="movie" placeholder="Enter a movie" autocomplete="off" />
+                <button type="submit">Get recommendations</button>
+            </form>
+
+            <p class="callout">Try a well-known title like Inception, Toy Story, or The Dark Knight.</p>
+        </section>
+    </main>
 </body>
 </html>

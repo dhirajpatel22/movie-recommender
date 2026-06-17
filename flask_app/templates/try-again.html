@@ -3,25 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Recommendations for {{ title }}</title>
+    <title>Movie not found</title>
     <link href="{{url_for('static', filename='styles/style.css')}}" rel="stylesheet" />
 </head>
 <body>
     <main class="page">
-        <section class="card">
+        <section class="card empty-state">
             <div class="hero">
-                <span class="eyebrow">Recommendations</span>
-                <h1>Movies similar to {{ title }}</h1>
-                <p class="subtitle">Top ranked movies similar to your selection.</p>
-            </div>
-
-            <div class="table-wrap">
-                {{ recommendations | safe }}
+                <span class="eyebrow">No match found</span>
+                <h1>We could not find that movie.</h1>
+                <p class="subtitle">Try another title or check the spelling, then search again.</p>
             </div>
 
             <form class="search-form" action="/movie" method="get">
                 <input type="text" name="movie" id="movie" placeholder="Enter a movie" />
-                <button type="submit">Search again</button>
+                <button type="submit">Try again</button>
             </form>
         </section>
     </main>
