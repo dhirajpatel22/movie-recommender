@@ -29,15 +29,16 @@ def get_movie():
 
         movie_factors = svd
             
-        movie = request.args.get('movie')
-        recommendations = recommend_movies(movie, movie_user_sparse, svd, movie_lookup, 'svd', n_recs=5)
+        movie = request.args.get('movie').strip()
+
+        (recommendations, title) = recommend_movies(movie, movie_user_sparse, svd, movie_lookup, 'svd', n_recs=5)
         if recommendations is None:
-            return render_template('movie.html', title=movie, recommendations='Movie not found. Please try again.', error="Movie not found. Please try again.")
+            return render_template('try-again.html')
 
         recommendations = recommendations.reset_index(drop=True)
         recommendations.index = recommendations.index + 1
         
-        return render_template('movie.html', title = movie, 
+        return render_template('movie.html', title = title, 
                                recommendations=recommendations.to_html(
                                    classes='recommendations-table',
                                    index=True,

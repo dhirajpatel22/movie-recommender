@@ -23,7 +23,9 @@ idx_to_movie = data['idx_to_movie']
 movie_factors = svd
 
 def find_movie_id(movie_name, lookup_df):
-    """Find the movieId for a given movie title, using exact and fuzzy matching. Returns None if no match is found."""
+    """Find the movieId for a given movie title, using exact and fuzzy matching. Returns a tuple of the recomendations df, 
+    and the title of the movie in the csv. 
+    Returns (None, None) if no match is found."""
     titles = lookup_df['title']
 
     exact_match = titles[titles.str.lower() == movie_name.lower()]
@@ -42,8 +44,10 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, model_type='svd', 
     
     movie_id = find_movie_id(movie_name, lookup_df)
     if movie_id is None:
-        return None
+        return None, None
     movie_idx = movie_to_idx[movie_id]
+
+    title = movie_lookup.loc[movie_id, 'title']
 
     if model_type.lower() == 'svd':
         #print("Using SVD model for recommendations.")
@@ -59,16 +63,13 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, model_type='svd', 
                 'Title': lookup_df.loc[rec_movie_id, 'title'],
                 'Similarity': similarities[idx],
             })
-        #print(f"Recommendations for '{movie_name}' at movieId {movie_id}:")
-        return pd.DataFrame(recs)
 
+        return pd.DataFrame(recs), title
+    
+if __name__ == "__main__":
+    movie = input("Please enter a movie: ")
 
-if __name__ == "__main__": 
-    print("\n*** Recommend Movie***\n")
-
-    movie = input('\nPlease enter a movie: ')
-
-    movie_rec = recommend_movies(movie)
-
-    print("\n")
-    print(movie_rec)
+    (rec, title) = recommend_movies(movie, movie_user_sparse, svd, movie_lookup, 'svd', n_recs=5)
+    print(rec)
+    print("--------------------------")
+    print(f"Movie name in csv: {title}")
