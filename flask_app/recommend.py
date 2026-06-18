@@ -61,10 +61,12 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, model_type='svd', 
             recs.append({
                 'movieId': rec_movie_id,
                 'Title': lookup_df.loc[rec_movie_id, 'title'],
-                'Similarity': similarities[idx],
+                'Similarity': round(similarities[idx], 3)
             })
-
-        return pd.DataFrame(recs), title
+        
+        df = pd.DataFrame(recs)
+        df = df[['Title', 'Similarity']]
+        return df, title
     
 if __name__ == "__main__":
     movie = input("Please enter a movie: ")
