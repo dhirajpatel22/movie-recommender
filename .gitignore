@@ -1,4 +1,11 @@
-Data/
+Data/credits.csv
+Data/keywords.csv
+Data/links.csv
+Data/links_small.csv
+Data/movies_metadata.csv
+Data/ratings.csv
+Data/ratings_small.csv
+
 .DS_Store
 flask_app/svd_model.pkl
 svd_model.pkl
