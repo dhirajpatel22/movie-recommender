@@ -19,7 +19,7 @@ choosing **SVD** for the web app.
 | Backend | Flask |
 | Machine Learning | scikit-learn (SVD) |
 | Data Processing | Pandas, SciPy |
-| Frontend | HTML, CSS, Jinja2 |
+| Frontend | HTML, CSS|
 | Dataset | MovieLens |
 
 ## Project Structure
