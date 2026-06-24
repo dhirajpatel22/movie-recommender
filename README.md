@@ -30,7 +30,7 @@ movie-recommender/
 ├── requirements.txt       # Python dependencies
 ├── model.ipynb            # Data preprocesseing & model training
 ├── README.md
-├── flask_app/ 
+├── flask-app/ 
     ├── app.py             # Flask application
     ├── recommend.py       # Recommendation logic
     ├── templates/
@@ -83,7 +83,7 @@ These files are saved as `.pkl` files.
 
 ### Step 2: Move Generated Files
 
-Move `svd_model.pkl` and `recommendation_data.pkl` files into the `flask_app/` directory.
+Move `svd_model.pkl` and `recommendation_data.pkl` files into the `flask-app/` directory.
 
 Example:
 
@@ -93,7 +93,7 @@ movie-recommender/
 ├── requirements.txt       
 ├── model.ipynb           
 ├── README.md
-├── flask_app/ 
+├── flask-app/ 
     ├── app.py            
     ├── recommend.py             
     ├── svd_model.pkl            # model file
@@ -109,7 +109,7 @@ movie-recommender/
 ### Step 3: Start the Flask Server
 
 ```bash
-cd flask_app
+cd flask-app
 python app.py
 ```
 
