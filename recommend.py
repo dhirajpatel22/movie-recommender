@@ -4,8 +4,11 @@ from sklearn.neighbors import NearestNeighbors
 from scipy.sparse import csr_matrix
 from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
 import numpy as np
 import pickle
+
+from sklearn.preprocessing import MinMaxScaler
 
 # Load recommendation data
 with open('recommendation_data.pkl', 'rb') as file:
@@ -19,6 +22,8 @@ movie_index = data['movie_index']
 movie_lookup = data['movie_lookup']
 movie_to_idx = data['movie_to_idx']
 idx_to_movie = data['idx_to_movie']
+content_data = data['content_data']
+movie_id_map = data['movie_id_map']
 
 movie_factors = svd
 
@@ -39,7 +44,9 @@ def find_movie_id(movie_name, lookup_df):
 
     return None
 
-def recommend_movies(movie_name, matrix, cf_model, lookup_df, model_type='svd', n_recs=10):
+# Collaborative Filtering Recommendation Function
+
+def get_collaborative_recommendations(movie_name, matrix, cf_model, lookup_df, model_type='svd', n_recs=10):
     """Return a dataframe of top-N similar movies for a given movie title."""
     
     movie_id = find_movie_id(movie_name, lookup_df)
@@ -65,13 +72,111 @@ def recommend_movies(movie_name, matrix, cf_model, lookup_df, model_type='svd', 
             })
         
         df = pd.DataFrame(recs)
-        df = df[['Title', 'Similarity']]
         return df, title
     
-if __name__ == "__main__":
-    movie = input("Please enter a movie: ")
 
-    (rec, title) = recommend_movies(movie, movie_user_sparse, svd, movie_lookup, 'svd', n_recs=5)
+# Content-Based Filtering Approach
+
+vectorizer = TfidfVectorizer(
+    stop_words='english',
+    min_df=2,
+    max_df=0.7,
+    ngram_range=(1, 2)
+    )
+content_matrix = vectorizer.fit_transform(content_data['content'].fillna(''))
+content_movie_ids = content_data['tmdbId']
+content_lookup = content_data.set_index('tmdbId')
+
+def get_content_recommendations(movie_name, movie_features, lookup_df, n_recs=10):
+    """Return a dataframe of top-N similar movies for a given movie title using content-based filtering."""
+    
+    movie_id = find_movie_id(movie_name, lookup_df)
+    if movie_id is None:
+        raise ValueError(f"Movie '{movie_name}' not found.")
+    
+    title = content_lookup.loc[movie_id, 'title']
+    
+    movie_positions = content_movie_ids[content_movie_ids == movie_id].index
+    if len(movie_positions) == 0:
+        raise ValueError(f"Movie '{movie_name}' not found in keyword features.")
+    movie_idx = movie_positions[0]
+    
+    # Get the feature vector for the selected movie
+    movie_features_vector = movie_features[movie_idx]
+    
+    # Calculate cosine similarity between the selected movie and all other movies
+    similarities = cosine_similarity(movie_features_vector, movie_features).flatten()
+    
+    # Get the indices of the most similar movies
+    similar_indices = similarities.argsort()[::-1][1:n_recs+1]  # Exclude the movie itself
+    
+    # Create a list of recommended movies
+    recs = []
+    for idx in similar_indices:
+        rec_movie_id = int(content_movie_ids.iloc[idx])
+        recs.append({
+            'tmdbId': rec_movie_id,
+            'Title': content_lookup.loc[rec_movie_id, 'title'],
+            'Similarity': similarities[idx]
+        })
+    
+    df = pd.DataFrame(recs)
+    return df, title
+
+# Hybrid Recommendation System
+
+def get_hybrid_recommendations(movie_name, movie_user_sparse,model, keyword_matrix, movie_lookup, content_lookup, n_recs=10, collab_weight=0.5, content_weight=0.5):
+    """Return a dataframe of top-N similar movies for a given movie title using both collaborative and content-based filtering."""
+
+    # Detect collaborative model type
+    if hasattr(model, 'kneighbors'):
+        model_type = 'knn'
+    elif hasattr(model, 'components_'):
+        model_type = 'svd'
+    else:
+        raise ValueError("Unsupported collaborative model.")
+
+    # Get recommendations from both systems
+    (collab_recs, title) = get_collaborative_recommendations( movie_name, movie_user_sparse, model,  movie_lookup,  model_type, n_recs=500)
+    (content_recs, _) = get_content_recommendations(  movie_name,  keyword_matrix, content_lookup, n_recs=500)
+
+    collab_recs = collab_recs.merge(movie_id_map, on='movieId', how='left')
+
+    # Rename columns for clarity
+    collab_recs = collab_recs.rename(columns={'Similarity': 'Similarity_collab','Title': 'Title_collab'})
+    content_recs = content_recs.rename(columns={'Similarity': 'Similarity_content','Title': 'Title_content' })
+
+    # Keep ALL recommendations from either system
+    hybrid = pd.merge(collab_recs, content_recs, on='tmdbId', how='outer')
+
+    # Missing score = movie wasn't recommended by that model
+    hybrid['Similarity_collab'] = hybrid['Similarity_collab'].fillna(0)
+    hybrid['Similarity_content'] = hybrid['Similarity_content'].fillna(0)
+
+    # Use whichever title exists
+    hybrid['Title'] = hybrid['Title_collab'].fillna(hybrid['Title_content'])
+
+    # Normalize scores to 0-1
+    scaler = MinMaxScaler()
+    hybrid['Similarity_collab'] = scaler.fit_transform( hybrid[['Similarity_collab']] )
+    hybrid['Similarity_content'] = scaler.fit_transform(hybrid[['Similarity_content']])
+
+    # Weighted hybrid score
+    hybrid['Hybrid_Score'] = (collab_weight * hybrid['Similarity_collab'] + content_weight * hybrid['Similarity_content'])
+
+    # Remove duplicate movies
+    hybrid = hybrid.drop_duplicates(subset=['tmdbId'])
+    # Sort by hybrid score
+    hybrid = hybrid.sort_values(by='Hybrid_Score', ascending=False)
+
+    df = hybrid[['tmdbId', 'Title', 'Hybrid_Score']].head(n_recs)
+
+    return df, title
+
+if __name__ == "__main__":
+    movie = input("Please enter a movie (content): ")
+
+    (rec, title) = get_hybrid_recommendations(movie, movie_user_sparse, svd, content_matrix, movie_lookup, content_lookup, n_recs=10, collab_weight=0.5, content_weight=0.5)
+    print(f"Recommendations for '{title}':")
     print(rec)
-    print("--------------------------")
-    print(f"Movie name in csv: {title}")
+    print("\n Title in the dataset:", title)
