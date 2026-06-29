@@ -136,6 +136,10 @@ def get_hybrid_recommendations(movie_name, movie_user_sparse,model, keyword_matr
     else:
         raise ValueError("Unsupported collaborative model.")
 
+    movie_id = find_movie_id(movie_name, movie_lookup)
+    if movie_id is None:
+        return None, None
+
     # Get recommendations from both systems
     (collab_recs, title) = get_collaborative_recommendations( movie_name, movie_user_sparse, model,  movie_lookup,  model_type, n_recs=500)
     (content_recs, _) = get_content_recommendations(  movie_name,  keyword_matrix, content_lookup, n_recs=500)
@@ -162,14 +166,14 @@ def get_hybrid_recommendations(movie_name, movie_user_sparse,model, keyword_matr
     hybrid['Similarity_content'] = scaler.fit_transform(hybrid[['Similarity_content']])
 
     # Weighted hybrid score
-    hybrid['Hybrid_Score'] = (collab_weight * hybrid['Similarity_collab'] + content_weight * hybrid['Similarity_content'])
+    hybrid['Hybrid Score'] = (collab_weight * hybrid['Similarity_collab'] + content_weight * hybrid['Similarity_content'])
 
     # Remove duplicate movies
     hybrid = hybrid.drop_duplicates(subset=['tmdbId'])
     # Sort by hybrid score
-    hybrid = hybrid.sort_values(by='Hybrid_Score', ascending=False)
+    hybrid = hybrid.sort_values(by='Hybrid Score', ascending=False)
 
-    df = hybrid[['tmdbId', 'Title', 'Hybrid_Score']].head(n_recs)
+    df = hybrid[['tmdbId', 'Title', 'Hybrid Score']].head(n_recs)
 
     return df, title
 

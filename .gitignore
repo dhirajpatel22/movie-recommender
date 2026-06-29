@@ -11,6 +11,7 @@ flask-app/svd_model.pkl
 svd_model.pkl
 recommendation_data.pkl
 flask-app/recommendation_data.pkl
+tfidf_matrix.pkl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
